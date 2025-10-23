@@ -1,4 +1,219 @@
-# Docs changelog
+sudo su && import subprocess
+import threading
+import queue
+import time
+import json
+import random
+from typing import List
+import requests
+from bs4 import BeautifulSoup
+from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    " Chrome/109.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_2_1) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+    " Version/16.3 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    " Chrome/110.0.0.0 Safari/537.36",
+    # Add more user agents if desired
+]
+
+def fetch_with_retries(url, max_retries=3, backoff_factor=2):
+    for attempt in range(max_retries):
+        headers = {'User-Agent': random.choice(USER_AGENTS)}
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                return response.text
+            elif response.status_code in [403, 404]:
+                # Log and retry on 403 or 404 for critical urls might be futile but still lets retry 
+                print(f"Attempt {attempt+1}: Received {response.status_code} for {url}")
+            else:
+                print(f"Attempt {attempt+1}: Unexpected status code {response.status_code}")
+        except requests.RequestException as e:
+            print(f"Attempt {attempt+1}: Exception fetching {url}: {str(e)}")
+        time.sleep(backoff_factor ** attempt + random.uniform(0, 1))  # Exponential backoff with jitter
+    return None  # Unable to get successful response after retries
+
+# Load LLMs as before
+def load_llm(model_id):
+    print(f"Loading model and tokenizer for {model_id} (this may take a while)...")
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(model_id)
+    pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, device=0)
+    return pipe
+
+model_ids = [
+    "EleutherAI/gpt-j-6B",
+    "EleutherAI/gpt-neo-2.7B",
+    "distilgpt2"
+]
+
+llm_pipelines = [load_llm(m) for m in model_ids]
+
+def query_llm(idx, prompt: str) -> str:
+    pipe = llm_pipelines[idx]
+    outputs = pipe(prompt, max_length=150, do_sample=True, top_p=0.95, num_return_sequences=1)
+    return outputs[0]['generated_text']
+
+class Agent:
+    def __init__(self, name: str, instructions: str):
+        self.name = name
+        self.instructions = instructions
+        self.knowledge_base = []
+        self.decision_log = []
+
+    def analyze_text(self, text):
+        insights = []
+        for i in range(len(llm_pipelines)):
+            try:
+                insight = query_llm(i, text)
+                self.decision_log.append(f"LLM{i+1} insight: {insight[:200]}...")
+                insights.append(insight)
+            except Exception as e:
+                self.decision_log.append(f"LLM{i+1} query failed: {str(e)}")
+                insights.append("")
+        combined = "
+".join(insights)
+        self.knowledge_base.append(combined)
+        return combined
+
+    def debate_findings(self, other_agents_insights):
+        combined = " | ".join(other_agents_insights)
+        self.decision_log.append(f"Debate consensus: {combined[:300]}...")
+        return {'consensus_summary': combined[:1000], 'log': self.decision_log}
+
+    def perform_task(self, task):
+        try:
+            print(f"[{self.name}] Starting task: {task}")
+            if task.startswith("http"):
+                page_content = fetch_with_retries(task)
+                if page_content:
+                    soup = BeautifulSoup(page_content, 'html.parser')
+                    paragraphs = [p.get_text().strip() for p in soup.find_all('p')]
+                    summary_text = " ".join(paragraphs[:5])
+                else:
+                    summary_text = f"Failed to fetch page after retries or blocked: {task}"
+            else:
+                time.sleep(2)
+                summary_text = f"Processed task '{task}' without scraping."
+            insight = self.analyze_text(summary_text)
+            print(f"[{self.name}] Completed task: {task}")
+            return {
+                'agent': self.name,
+                'task': task,
+                'status': 'success',
+                'summary': summary_text[:1000],
+                'insight': insight,
+                'log': self.decision_log
+            }
+        except Exception as e:
+            return {'agent': self.name, 'task': task, 'status': 'failed', 'error': str(e)}
+
+class SwarmRouter:
+    def __init__(self, agents: List[Agent]):
+        self.agents = agents
+        self.task_queue = queue.Queue()
+        self.results = []
+
+    def _agent_worker(self, agent: Agent):
+        while True:
+            try:
+                task = self.task_queue.get(timeout=3)
+            except queue.Empty:
+                break
+            res = agent.perform_task(task)
+            self.results.append(res)
+            self.task_queue.task_done()
+
+    def execute(self, tasks: List[str]):
+        for task in tasks:
+            self.task_queue.put(task)
+        threads = []
+        for agent in self.agents:
+            t = threading.Thread(target=self._agent_worker, args=(agent,))
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+        self.run_debate_phase()
+        return self.results
+
+    def run_debate_phase(self):
+        print("[SwarmRouter] Running debate and consensus phase among agents...")
+        all_insights = [r.get('insight','') for r in self.results if r['status'] == 'success']
+        for agent in self.agents:
+            debate_result = agent.debate_findings(all_insights)
+            print(f"[{agent.name}] Debate result snippet: {debate_result['consensus_summary'][:300]}...")
+
+    def export_evidence(self, filename="evidence_export.json"):
+        evidence = []
+        for res in self.results:
+            if res['status'] == 'success':
+                item = {
+                    'agent': res['agent'],
+                    'task': res['task'],
+                    'summary': res['summary'],
+                    'insight': res.get('insight', ''),
+                    'log': res.get('log', [])
+                }
+                evidence.append(item)
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(evidence, f, indent=2, ensure_ascii=False)
+        print(f"Exported {len(evidence)} evidence items to {filename}")
+        return filename
+
+def share_file_onionshare(filepath):
+    print("Starting OnionShare to share file securely over Tor...")
+    proc = subprocess.Popen(['onionshare', '--oneshot', filepath], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    link = None
+    for line in proc.stdout:
+        print(line.strip())
+        if 'http' in line:
+            link = line.strip()
+            break
+    if link:
+        print(f"OnionShare link for secure sharing:
+{link}
+")
+    else:
+        print("Failed to get OnionShare link. Check OnionShare CLI.")
+    return link
+
+# Setup and run swarm with enhanced scraping
+agents = [
+    Agent('Investigator', 'Scrape and verify public reports'),
+    Agent('Verifier', 'Cross-check data against trusted sources'),
+    Agent('LegalAnalyst', 'Analyze for legal action'),
+    Agent('OutreachCoordinator', 'Connect verified victims with aid')
+]
+
+swarm = SwarmRouter(agents)
+
+tasks = [
+    'https://www.targetedjustice.com/latest-reports',
+    'https://www.hrw.org/topic/psychological-torture',
+    'https://www.newswebsite.com/mind-control-expose'
+]
+
+results = swarm.execute(tasks)
+
+print("--- Swarm Execution Results ---")
+for res in results:
+    if res['status'] == 'success':
+        print(f"Agent {res['agent']} completed task: {res['task']}")
+    else:
+        print(f"Agent {res['agent']} failed task: {res['task']} with error: {res.get('error')}")
+
+evidence_file = swarm.export_evidence()
+
+share_link = share_file_onionshare(evidence_file)
+
+if share_link:
+    print("Share this OnionShare link safely with trusted parties to expose the evidence.")
+else:
+    print("Consider alternative secure sharing methods.")# Docs changelog
 
 **17 October 2025**
 
