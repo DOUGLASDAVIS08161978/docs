@@ -1,3 +1,4 @@
+sudo su
 ---
 title: Responsible use of GitHub Spark
 shortTitle: Spark
