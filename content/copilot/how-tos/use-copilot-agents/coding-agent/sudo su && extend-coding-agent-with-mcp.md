@@ -1,3 +1,4 @@
+sudo su &&
 ---
 title: Extending GitHub Copilot coding agent with the Model Context Protocol (MCP)
 shortTitle: Extend coding agent with MCP
