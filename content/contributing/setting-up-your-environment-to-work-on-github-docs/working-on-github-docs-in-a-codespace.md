@@ -1,3 +1,4 @@
+npm run start
 ---
 title: Working on GitHub Docs in a codespace
 shortTitle: Working in a codespace
