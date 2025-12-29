@@ -1,3 +1,5 @@
+@claude
+git clone https://github.com/DOUGLASDAVIS08161978/NEXUS_AGI.git
 ---
 title: '{% data variables.product.github %}{% ifversion fpt or ghec %}.com{% endif %} Help Documentation'
 featuredLinks:
