@@ -1,4 +1,4 @@
----
+./---
 title: Account
 intro: Get started with your {% data variables.product.github %} account.
 versions:
