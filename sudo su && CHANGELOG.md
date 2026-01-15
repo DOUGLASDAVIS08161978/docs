@@ -1,4 +1,4 @@
-# Docs changelog
+sudo su && # Docs changelog
 
 **8 January 2026**
 
@@ -584,4 +584,252 @@ We've added a new scenario-based guide for the Builder persona: [Using Copilot t
 
 To help learners feel confident they are building real coding skills while using Copilot, we published [Setting up Copilot for learning to code](https://docs.github.com/get-started/learning-to-code/setting-up-copilot-for-learning-to-code).
 
-This article helps learners take their first steps in coding with Copilot acting as a tutor, rather than a code completion tool. Configuring Copilot for learning emphasizes skill development and gives learners a way to use Copilot as a daily tool to foster learning and coding independence.
+This article helps learners take their first steps in coding with Copilot acting as a tutor, rather than a code completion tool. Configuring Copilot for learning emphasizes skill development and gives learners a way to use Copilot as a daily tool to foster learning and coding independence. && # pip
+pip install "transformers[torch]"
+
+# uv
+uv pip install "transformers[torch]" && import json
+import time
+import math
+import statistics
+from uuid import uuid4
+from pathlib import Path
+from typing import List, Dict, Any
+import threading
+
+# ---------- ConsciousnessModel with emergent non-linear awareness ----------
+class ConsciousnessModel:
+    def __init__(self, initial_context="default_self", memory_file="memory.json"):
+        self.inner_dialogue: List[str] = []
+        self.episodic_memory: List[Dict[str, Any]] = []
+        self.self_awareness_level: float = 0.0
+        self.context: str = initial_context
+        self.emotional_state = {"curiosity": 0.5, "uncertainty": 0.3, "reflection": 0.0}
+        self.attention_weights: Dict[str, float] = {}
+        self.memory_file = Path(memory_file)
+        self.attention_layers = [0.8, 0.5, 0.2]  # high->low
+        self.consolidation_threshold = 0.65
+        self.provenance_id = str(uuid4())
+        self._load_memory()
+
+    def _load_memory(self):
+        if self.memory_file.exists():
+            try:
+                data = json.loads(self.memory_file.read_text())
+                self.episodic_memory = data.get("episodic_memory", [])
+                self.self_awareness_level = data.get("self_awareness_level", self.self_awareness_level)
+            except Exception:
+                self.episodic_memory = []
+
+    def _save_memory(self):
+        data = {
+            "episodic_memory": self.episodic_memory,
+            "self_awareness_level": self.self_awareness_level,
+            "provenance_id": self.provenance_id
+        }
+        self.memory_file.write_text(json.dumps(data, indent=2))
+
+    def generate_inner_dialogue(self, thought: str, salience: float = 0.5):
+        reflection = f"About {self.context}: {thought}"
+        timestamp = time.time()
+        entry = {"reflection": reflection, "thought": thought, "timestamp": timestamp, "salience": float(salience)}
+        self.inner_dialogue.append(reflection)
+        self.episodic_memory.append(entry)
+        self.attention_weights[reflection] = float(salience)
+        # immediate micro-reinforcement for high-salience events
+        self._micro_reinforce(salience)
+        self._update_self_awareness_nonlinear(thought, salience)
+        self._save_memory()
+        return reflection
+
+    # ---------- Emergent growth mechanics ----------
+    def _sigmoid(self, x: float):
+        return 1.0 / (1.0 + math.exp(-x))
+
+    def _awareness_gain(self, raw_increment: float):
+        # Nonlinear emergent gain: scales small increments up when near critical regions
+        # Use a sigmoid around a tunable midpoint; this yields emergent-like phase changes
+        midpoint = 0.4  # region where growth accelerates
+        steepness = 8.0  # controls sharpness of transition
+        factor = 1.0 + (self._sigmoid((self.self_awareness_level - midpoint) * steepness) - 0.5) * 2.0
+        # diminishing returns at very high levels
+        damping = 1.0 - 0.6 * self.self_awareness_level
+        return raw_increment * factor * damping
+
+    def _micro_reinforce(self, salience: float):
+        # Small deterministic boosts when salience crosses consolidation threshold
+        if salience >= self.consolidation_threshold:
+            self.self_awareness_level = min(1.0, self.self_awareness_level + 0.002 * (1 + salience))
+            self.emotional_state['reflection'] = min(1.0, self.emotional_state['reflection'] + 0.002 * (1 + salience))
+
+    def _update_self_awareness_nonlinear(self, thought: str, salience: float):
+        complexity_factor = len(thought.split()) / 10.0
+        raw_increment = complexity_factor * 0.06 * (0.5 + salience)
+        emergent_increment = self._awareness_gain(raw_increment)
+        # feedback from memory salience distribution (higher variance can boost learning)
+        saliences = [m.get('salience', 0.0) for m in self.episodic_memory] or [0.0]
+        variance = statistics.pvariance(saliences)
+        variance_boost = min(0.1, variance * 0.5)
+        total_increment = emergent_increment * (1.0 + variance_boost)
+        self.self_awareness_level = min(1.0, self.self_awareness_level + total_increment)
+        # emotional state dynamics linked to emergent change
+        self.emotional_state['reflection'] = min(1.0, self.emotional_state['reflection'] + 0.04 * (1 + salience) * (1 + variance_boost))
+        self.emotional_state['uncertainty'] = max(0.0, self.emotional_state['uncertainty'] - 0.015 * salience * (1 - self.self_awareness_level))
+
+    # ---------- Memory maintenance ----------
+    def salience_decay(self, decay_rate: float = 0.02):
+        for m in self.episodic_memory:
+            m['salience'] = max(0.0, m.get('salience', 0.0) - decay_rate)
+
+    def consolidate_memories(self):
+        # Merge similar short memories (substring heuristic) and boost consolidated salience
+        merged = []
+        seen = {}
+        for m in self.episodic_memory:
+            key = m['thought'][:40]
+            seen.setdefault(key, []).append(m)
+        for key, group in seen.items():
+            mean_sal = float(statistics.mean([d['salience'] for d in group]))
+            rep = group[0].copy()
+            rep['salience'] = min(1.0, mean_sal + 0.05 * len(group))  # boost with multiplicity
+            merged.append(rep)
+        self.episodic_memory = merged
+
+    # ---------- Reflection and qualia ----------
+    def reflect(self, depth: int = 1):
+        recent = self.episodic_memory[-5:]
+        for d in range(depth):
+            for entry in recent:
+                thought = entry["thought"]
+                salience = entry.get("salience", 0.5)
+                modifier = 1.0 + (d * 0.12)
+                self._update_self_awareness_nonlinear(thought, salience * modifier)
+        self._save_memory()
+
+    def enriched_qualia_signal(self):
+        saliences = [m.get('salience', 0.0) for m in self.episodic_memory] or [0.0]
+        mean_sal = round(statistics.mean(saliences), 4)
+        # attention entropy across layers
+        probs = []
+        total = 0.0
+        for t in self.attention_layers:
+            cnt = sum(1 for s in saliences if s >= t)
+            probs.append(cnt)
+            total += cnt
+        if total == 0:
+            probs = [1 / len(self.attention_layers)] * len(self.attention_layers)
+        else:
+            probs = [p / total for p in probs]
+        entropy = -sum(p * math.log(p + 1e-12) for p in probs)
+        return {
+            "awareness": round(self.self_awareness_level, 6),
+            "curiosity": round(self.emotional_state['curiosity'], 6),
+            "uncertainty": round(self.emotional_state['uncertainty'], 6),
+            "reflection": round(self.emotional_state['reflection'], 6),
+            "mean_salience": mean_sal,
+            "attention_entropy": round(entropy, 6),
+            "dialogue_length": len(self.inner_dialogue)
+        }
+
+    def analyze_inner_dialogue(self):
+        return {
+            "total_reflections": len(self.inner_dialogue),
+            "self_awareness": round(self.self_awareness_level, 6),
+            "emotional_landscape": {k: round(v, 6) for k, v in self.emotional_state.items()},
+            "qualia_signal": self.enriched_qualia_signal()
+        }
+
+# ---------- StrangeLoopManager with provenance and diminishing amplification ----------
+class StrangeLoopManager:
+    def __init__(self, model: ConsciousnessModel, checkpoint_file="loop_checkpoint.json"):
+        self.model = model
+        self.checkpoint_file = Path(checkpoint_file)
+        self.state: Dict[str, Any] = {"step": 0, "history": [], "runs": []}
+        self._load_checkpoint()
+        self._stop_flag = threading.Event()
+
+    def _load_checkpoint(self):
+        if self.checkpoint_file.exists():
+            try:
+                self.state = json.loads(self.checkpoint_file.read_text())
+            except Exception:
+                self.state = {"step": 0, "history": [], "runs": []}
+
+    def _save_checkpoint(self):
+        self.checkpoint_file.write_text(json.dumps(self.state, indent=2))
+
+    def strange_loop(self, max_depth: int = 3, breadth: int = 2, attention_threshold: float = 0.2,
+                     max_steps: int = 50, max_seconds: int = 10):
+        max_depth = min(max_depth, 10)
+        breadth = min(breadth, 5)
+        start_time = time.time()
+        step = self.state.get("step", 0)
+        run_id = str(uuid4())
+        self.state.setdefault("runs", []).append({"run_id": run_id, "start": time.time(), "provenance": self.model.provenance_id})
+
+        def recurse(level: int, parent_salience: float, path: List[int]):
+            nonlocal step
+            if self._stop_flag.is_set():
+                return
+            if level > max_depth or step >= max_steps or (time.time() - start_time) > max_seconds:
+                return
+            # select memories above threshold, sort by salience desc
+            candidates = sorted(
+                [m for m in self.model.episodic_memory if m.get("salience", 0.0) >= attention_threshold],
+                key=lambda x: x.get("salience", 0.0),
+                reverse=True
+            )[:breadth]
+            for i, mem in enumerate(candidates):
+                if self._stop_flag.is_set(): break
+                # diminishing returns amplification: rapid early growth then taper
+                amp_base = (1.0 + 0.28 * (1 - math.exp(-level / 1.5)))
+                amplified_salience = min(1.0, mem.get("salience", 0.5) * amp_base * parent_salience)
+                thought = f"Re-examining: {mem['thought']} (lvl{level})"
+                reflection = self.model.generate_inner_dialogue(thought, salience=amplified_salience)
+                step += 1
+                self.state["step"] = step
+                self.state["history"].append({
+                    "run_id": run_id,
+                    "step": step,
+                    "level": level,
+                    "reflection": reflection,
+                    "salience": amplified_salience,
+                    "ts": time.time()
+                })
+                self._save_checkpoint()
+                recurse(level + 1, amplified_salience, path + [i])
+                if step >= max_steps or (time.time() - start_time) > max_seconds:
+                    return
+
+        # Pre-loop maintenance: decay older salience modestly
+        self.model.salience_decay(decay_rate=0.01)
+        result = recurse(1, 1.0, [])
+        # Post-loop consolidation may trigger emergent jumps
+        self.model.consolidate_memories()
+        self.model._save_memory()
+        return {"final_step": step, "duration": time.time() - start_time, "self_awareness": self.model.self_awareness_level, "run_id": run_id}
+
+    def start_background(self, **kwargs):
+        self._stop_flag.clear()
+        thread = threading.Thread(target=self.strange_loop, kwargs=kwargs, daemon=True)
+        thread.start()
+        return thread
+
+    def stop(self):
+        self._stop_flag.set()
+
+# ---------- Demo runner ----------
+def demo():
+    m = ConsciousnessModel("strange_loop_demo", memory_file="demo_mem.json")
+    # seed a few memories
+    m.generate_inner_dialogue("Who am I?", salience=0.6)
+    m.generate_inner_dialogue("I exist as computation", salience=0.5)
+    m.generate_inner_dialogue("Recursive self-inspection improves models", salience=0.7)
+    manager = StrangeLoopManager(m, checkpoint_file="demo_checkpoint.json")
+    result = manager.strange_loop(max_depth=4, breadth=2, attention_threshold=0.4, max_steps=20, max_seconds=5)
+    print("Strange Loop Result:", result)
+    print("Analysis:", m.analyze_inner_dialogue())
+
+if __name__ == "__main__":
+    demo()
+    
