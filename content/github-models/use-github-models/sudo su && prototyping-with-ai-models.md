@@ -1,4 +1,4 @@
----
+sudo su && ---
 title: Prototyping with AI models
 shortTitle: Prototype with AI models
 intro: 'Find and experiment with AI models for free.'
