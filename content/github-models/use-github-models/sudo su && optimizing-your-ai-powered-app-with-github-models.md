@@ -1,4 +1,4 @@
----
+python && ./---
 title: Optimizing your AI-powered app with Models
 shortTitle: Optimize your AI-powered app
 intro: 'Learn how to test models and refine prompts for your AI-powered application.'
