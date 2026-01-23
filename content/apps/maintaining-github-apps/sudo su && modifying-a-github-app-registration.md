@@ -1,3 +1,4 @@
+sudo su && 
 ---
 title: Modifying a GitHub App registration
 shortTitle: Modify app settings
